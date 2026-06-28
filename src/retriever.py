@@ -35,6 +35,10 @@ def retrieve_context(question: str, n_results: int = 3) -> str:
     return "\n\n---\n\n".join(context_parts)
 
 
+def retrieve(question, n_results=4):
+    return retrieve_context(question, n_results=n_results)
+
+
 if __name__ == "__main__":
     question = "Hvornår må patienten køre bil?"
     context = retrieve_context(question)

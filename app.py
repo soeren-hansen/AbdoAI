@@ -1,28 +1,51 @@
 import streamlit as st
-from pathlib import Path
+from openai import OpenAI
+from dotenv import load_dotenv
 
-st.set_page_config(page_title="AbdoAI", page_icon="🩺")
+from src.retriever import retrieve
 
-st.title("🩺 AbdoAI")
-st.write("Første prototype: chatbot baseret på én markdown-fil.")
+load_dotenv()
 
-knowledge_path = Path("knowledge/brok_kikkertoperation.md")
+client = OpenAI()
 
-if knowledge_path.exists():
-    content = knowledge_path.read_text(encoding="utf-8")
-    st.success("Vidensfil fundet.")
-else:
-    content = ""
-    st.error("Vidensfil mangler.")
+st.set_page_config(page_title="AbdoAI", page_icon="🏥")
+st.title("🏥 AbdoAI")
+st.caption("Spørgsmål besvares på baggrund af afdelingens egne dokumenter.")
 
-question = st.text_input("Stil et spørgsmål om brokoperation med kikkert:")
+question = st.chat_input("Stil et spørgsmål...")
 
 if question:
-    st.subheader("Spørgsmål")
-    st.write(question)
+    st.chat_message("user").write(question)
 
-    st.subheader("Foreløbigt svar")
-    st.write("Næste trin er at koble GPT på, så svaret dannes ud fra markdown-filen.")
+    with st.spinner("Finder relevante dokumenter..."):
+        results = retrieve(question)
 
-    with st.expander("Se markdown-indhold"):
-        st.markdown(content)
+    context = "\n\n".join(
+        [f"KILDE {i+1}:\n{doc}" for i, doc in enumerate(results)]
+    )
+
+    prompt = f"""
+Du er AbdoAI, en hjælpsom klinisk assistent for Abdominalcenter K.
+
+Svar kun ud fra nedenstående kontekst.
+Hvis svaret ikke findes i konteksten, så sig:
+"Det kan jeg ikke besvare ud fra de tilgængelige dokumenter."
+
+KONTEKST:
+{context}
+
+SPØRGSMÅL:
+{question}
+"""
+
+    with st.spinner("Skriver svar..."):
+        response = client.chat.completions.create(
+            model="gpt-4.1-mini",
+            messages=[
+                {"role": "system", "content": "Du svarer klart, sikkert og på dansk."},
+                {"role": "user", "content": prompt},
+            ],
+        )
+
+    answer = response.choices[0].message.content
+    st.chat_message("assistant").write(answer)
